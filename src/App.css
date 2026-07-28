@@ -617,6 +617,10 @@
   padding: 16px 18px;
 }
 
+.settings-directory-action {
+  align-self: center;
+}
+
 .settings-editor-header {
   padding: 16px 28px;
 }
@@ -788,6 +792,11 @@
   width: min(100%, 590px);
   height: 38px;
   background: var(--card);
+}
+
+.settings-avatar-file-input[data-slot="input"],
+.message-editor__image-file-input[data-slot="input"] {
+  cursor: pointer;
 }
 
 .settings-field-copy {

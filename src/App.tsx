@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 
@@ -15,6 +15,7 @@ import { DEFAULT_SELECTED_CONTACT_ID } from "@/data/chat-data";
 import { useContactStore } from "@/hooks/use-contact-store";
 import { useMessageStore } from "@/hooks/use-message-store";
 import { useQQAvatar } from "@/hooks/use-qq-avatar";
+import { clearLocalImages } from "@/lib/local-image-store";
 import { cn } from "@/lib/utils";
 
 const currentUser = {
@@ -24,7 +25,8 @@ const currentUser = {
 };
 
 function App() {
-  const { contacts, resetContacts, updateContact } = useContactStore();
+  const { addContact, contacts, resetContacts, updateContact } =
+    useContactStore();
   const {
     addMessage,
     deleteMessage,
@@ -53,13 +55,29 @@ function App() {
     [contacts, selectedId],
   );
 
+  useEffect(() => {
+    if (
+      contacts.length > 0 &&
+      !contacts.some((contact) => contact.id === selectedId)
+    ) {
+      setSelectedId(contacts[0].id);
+    }
+  }, [contacts, selectedId]);
+
   if (!selectedContact) {
     return null;
   }
 
+  const createContact = () => {
+    const contact = addContact();
+    setSelectedId(contact.id);
+  };
+
   const resetAllData = () => {
+    void clearLocalImages().catch(() => undefined);
     resetContacts();
     resetMessages();
+    setSelectedId(DEFAULT_SELECTED_CONTACT_ID);
   };
 
   return (
@@ -83,6 +101,7 @@ function App() {
             <>
               <ConversationSidebar
                 contacts={contacts}
+                onAddContact={createContact}
                 onSelect={setSelectedId}
                 selectedId={selectedContact.id}
               />
@@ -96,6 +115,7 @@ function App() {
             <SettingsPanel
               contacts={contacts}
               messages={messages[selectedContact.id] ?? []}
+              onAddContact={createContact}
               onAddMessage={addMessage}
               onChange={updateContact}
               onDeleteMessage={deleteMessage}

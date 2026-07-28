@@ -1,5 +1,14 @@
-import { BellOff, RotateCcw, UserRoundXIcon } from "lucide-react"
+import {
+  BellOff,
+  RotateCcw,
+  UserPlusIcon,
+  UserRoundXIcon,
+} from "lucide-react"
 
+import {
+  LocalImageField,
+  type StoredLocalImage,
+} from "@/components/LocalImageField"
 import { MessageEditor } from "@/components/MessageEditor"
 import { ContactAvatarImage } from "@/components/ResolvedAvatarImage"
 import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar"
@@ -33,14 +42,19 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
-import type { Contact, Message } from "@/types/chat"
+import {
+  deleteLocalImage,
+  isLocalImageReference,
+} from "@/lib/local-image-store"
+import type { Contact, ContactPatch, Message } from "@/types/chat"
 
 export interface SettingsPanelProps {
   contacts: Contact[]
   messages: Message[]
   selectedId: string
+  onAddContact: () => void
   onSelect: (id: string) => void
-  onChange: (id: string, patch: Partial<Contact>) => void
+  onChange: (id: string, patch: ContactPatch) => void
   onAddMessage: (contactId: string, message: Message) => void
   onUpdateMessage: (
     contactId: string,
@@ -73,6 +87,7 @@ export function SettingsPanel({
   contacts,
   messages,
   selectedId,
+  onAddContact,
   onSelect,
   onChange,
   onAddMessage,
@@ -83,9 +98,46 @@ export function SettingsPanel({
   const selectedContact =
     contacts.find((contact) => contact.id === selectedId) ?? contacts[0]
 
-  const updateSelectedContact = (patch: Partial<Contact>) => {
+  const updateSelectedContact = (patch: ContactPatch) => {
     if (selectedContact) {
       onChange(selectedContact.id, patch)
+    }
+  }
+
+  const discardLocalImage = (source: string) => {
+    if (isLocalImageReference(source)) {
+      void deleteLocalImage(source).catch(() => undefined)
+    }
+  }
+
+  const restoreQQAvatar = () => {
+    if (!selectedContact) {
+      return
+    }
+
+    const previousSource = selectedContact.customAvatarUrl
+    updateSelectedContact({
+      avatarMode: "qq",
+      customAvatarUrl: isLocalImageReference(previousSource)
+        ? ""
+        : previousSource,
+    })
+    discardLocalImage(previousSource)
+  }
+
+  const useStoredAvatar = (image: StoredLocalImage) => {
+    if (!selectedContact) {
+      return
+    }
+
+    const previousSource = selectedContact.customAvatarUrl
+    updateSelectedContact({
+      avatarMode: "custom",
+      customAvatarUrl: image.reference,
+    })
+
+    if (previousSource !== image.reference) {
+      discardLocalImage(previousSource)
     }
   }
 
@@ -97,6 +149,17 @@ export function SettingsPanel({
           <CardDescription className="settings-directory-description">
             选择一位联系人编辑聊天列表资料
           </CardDescription>
+          <CardAction className="settings-directory-action">
+            <Button
+              aria-label="新增联系人"
+              type="button"
+              size="icon-sm"
+              variant="outline"
+              onClick={onAddContact}
+            >
+              <UserPlusIcon />
+            </Button>
+          </CardAction>
         </CardHeader>
 
         <Separator className="settings-card-separator" />
@@ -254,7 +317,11 @@ export function SettingsPanel({
                       <FieldDescription className="settings-avatar-preview-description">
                         {selectedContact.avatarMode === "qq"
                           ? `来自 QQ ${selectedContact.qq}`
-                          : "来自自定义图片链接"}
+                          : isLocalImageReference(
+                                selectedContact.customAvatarUrl,
+                              )
+                            ? "来自本机图片（已自动保存）"
+                            : "来自自定义图片链接"}
                       </FieldDescription>
                     </FieldContent>
 
@@ -264,9 +331,7 @@ export function SettingsPanel({
                       size="sm"
                       className="settings-avatar-reset"
                       disabled={selectedContact.avatarMode === "qq"}
-                      onClick={() =>
-                        updateSelectedContact({ avatarMode: "qq" })
-                      }
+                      onClick={restoreQQAvatar}
                     >
                       <RotateCcw data-icon="inline-start" />
                       恢复 QQ 头像
@@ -310,7 +375,7 @@ export function SettingsPanel({
                         使用 QQ 头像
                       </FieldLabel>
                       <FieldDescription className="settings-field-description">
-                        关闭后使用下方填写的自定义头像链接。
+                        关闭后使用下方选择的本机图片或自定义头像链接。
                       </FieldDescription>
                     </FieldContent>
                     <Switch
@@ -318,12 +383,24 @@ export function SettingsPanel({
                       className="settings-field-switch"
                       checked={selectedContact.avatarMode === "qq"}
                       onCheckedChange={(checked) =>
-                        updateSelectedContact({
-                          avatarMode: checked ? "qq" : "custom",
-                        })
+                        checked
+                          ? restoreQQAvatar()
+                          : updateSelectedContact({ avatarMode: "custom" })
                       }
                     />
                   </Field>
+
+                  <LocalImageField
+                    key={selectedContact.id}
+                    description="选择后会复制到本机保存，并自动切换为自定义头像。"
+                    descriptionClassName="settings-field-description"
+                    fieldClassName="settings-field"
+                    id="settings-contact-avatar-file"
+                    inputClassName="settings-field-input settings-avatar-file-input"
+                    label="本地头像"
+                    labelClassName="settings-field-label"
+                    onStored={useStoredAvatar}
+                  />
 
                   <Field
                     className="settings-field"
@@ -339,15 +416,33 @@ export function SettingsPanel({
                       id="settings-contact-avatar-url"
                       className="settings-field-input"
                       type="url"
-                      placeholder="https://example.com/avatar.png"
+                      placeholder={
+                        isLocalImageReference(
+                          selectedContact.customAvatarUrl,
+                        )
+                          ? "当前使用已保存的本机头像"
+                          : "https://example.com/avatar.png"
+                      }
                       disabled={selectedContact.avatarMode === "qq"}
-                      value={selectedContact.customAvatarUrl}
-                      onChange={(event) =>
+                      value={
+                        isLocalImageReference(
+                          selectedContact.customAvatarUrl,
+                        )
+                          ? ""
+                          : selectedContact.customAvatarUrl
+                      }
+                      onChange={(event) => {
+                        const previousSource =
+                          selectedContact.customAvatarUrl
                         updateSelectedContact({
                           customAvatarUrl: event.target.value,
                         })
-                      }
+                        discardLocalImage(previousSource)
+                      }}
                     />
+                    <FieldDescription className="settings-field-description">
+                      填写链接会替换当前选择的本机头像。
+                    </FieldDescription>
                   </Field>
 
                   <Separator className="settings-form-separator" />

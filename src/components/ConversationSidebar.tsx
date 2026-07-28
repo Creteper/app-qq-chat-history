@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 type ConversationSidebarProps = {
   contacts: Contact[];
   selectedId: string;
+  onAddContact: () => void;
   onSelect: (id: string) => void;
 };
 
@@ -27,6 +28,7 @@ function initials(name: string) {
 export function ConversationSidebar({
   contacts,
   selectedId,
+  onAddContact,
   onSelect,
 }: ConversationSidebarProps) {
   const [query, setQuery] = useState("");
@@ -60,6 +62,7 @@ export function ConversationSidebar({
           className="conversation-add"
           size="icon-lg"
           variant="ghost"
+          onClick={onAddContact}
         >
           <PlusIcon />
         </Button>

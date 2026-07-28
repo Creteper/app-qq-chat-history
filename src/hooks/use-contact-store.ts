@@ -9,9 +9,12 @@ type ContactUpdater = ContactPatch | ((contact: Contact) => ContactPatch)
 
 export interface ContactStore {
   contacts: Contact[]
+  addContact: (initial?: ContactPatch) => Contact
   updateContact: (id: Contact["id"], update: ContactUpdater) => void
   resetContacts: () => void
 }
+
+let fallbackContactIdSequence = 0
 
 function cloneDefaultContacts(): Contact[] {
   return defaultContacts.map((contact) => ({ ...contact }))
@@ -31,6 +34,44 @@ function normalizeUnreadCount(value: unknown, fallback = 0) {
   }
 
   return Math.max(0, Math.floor(value))
+}
+
+function isSafeContactId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value)
+  )
+}
+
+function createNewContact(id: Contact["id"]): Contact {
+  return {
+    id,
+    qq: "",
+    name: "新联系人",
+    avatarMode: "qq",
+    customAvatarUrl: "",
+    lastMessage: "暂无聊天记录",
+    timeLabel: "",
+    muted: false,
+    unreadCount: 0,
+    online: false,
+  }
+}
+
+function createUniqueContactId(contacts: Contact[]) {
+  const existingIds = new Set(contacts.map((contact) => contact.id))
+  let candidate = ""
+
+  do {
+    const token =
+      typeof globalThis.crypto?.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now().toString(36)}-${(fallbackContactIdSequence += 1).toString(36)}`
+
+    candidate = `contact-${token}`
+  } while (existingIds.has(candidate))
+
+  return candidate
 }
 
 /**
@@ -83,16 +124,37 @@ function loadContacts(): Contact[] {
       return cloneDefaultContacts()
     }
 
-    const storedById = new Map(
-      parsed
-        .filter(isRecord)
-        .filter((contact) => typeof contact.id === "string")
-        .map((contact) => [contact.id as string, contact]),
-    )
+    const storedContacts: Record<string, unknown>[] = []
+    const seenIds = new Set<string>()
 
-    return defaultContacts.map((contact) =>
+    for (const candidate of parsed) {
+      if (
+        !isRecord(candidate) ||
+        !isSafeContactId(candidate.id) ||
+        seenIds.has(candidate.id)
+      ) {
+        continue
+      }
+
+      seenIds.add(candidate.id)
+      storedContacts.push(candidate)
+    }
+
+    const storedById = new Map(
+      storedContacts.map((contact) => [contact.id as string, contact]),
+    )
+    const defaultIds = new Set(defaultContacts.map((contact) => contact.id))
+    const hydratedDefaults = defaultContacts.map((contact) =>
       hydrateContact(storedById.get(contact.id), contact),
     )
+    const customContacts = storedContacts
+      .filter((contact) => !defaultIds.has(contact.id as string))
+      .map((contact) => {
+        const fallback = createNewContact(contact.id as string)
+        return hydrateContact(contact, fallback)
+      })
+
+    return [...hydratedDefaults, ...customContacts]
   } catch {
     return cloneDefaultContacts()
   }
@@ -116,6 +178,23 @@ export function useContactStore(): ContactStore {
   useEffect(() => {
     persistContacts(contacts)
   }, [contacts])
+
+  const addContact = useCallback(
+    (initial: ContactPatch = {}) => {
+      const fallback = createNewContact(createUniqueContactId(contacts))
+      const contact = hydrateContact(
+        {
+          ...fallback,
+          ...initial,
+        },
+        fallback,
+      )
+
+      setContacts((currentContacts) => [...currentContacts, contact])
+      return contact
+    },
+    [contacts],
+  )
 
   const updateContact = useCallback(
     (id: Contact["id"], update: ContactUpdater) => {
@@ -153,5 +232,5 @@ export function useContactStore(): ContactStore {
     setContacts(cloneDefaultContacts())
   }, [])
 
-  return { contacts, updateContact, resetContacts }
+  return { contacts, addContact, updateContact, resetContacts }
 }

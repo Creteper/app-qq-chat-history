@@ -5,6 +5,7 @@ import {
   Attachment,
   AttachmentMedia,
 } from "@/components/ui/attachment"
+import { useResolvedImageSource } from "@/hooks/use-resolved-image-source"
 import { cn } from "@/lib/utils"
 import type { ImageMessage } from "@/types/chat"
 
@@ -71,6 +72,7 @@ export function ImageMessageAttachment({
 }: ImageMessageAttachmentProps) {
   const [loadedDimensions, setLoadedDimensions] =
     useState<LoadedImageDimensions | null>(null)
+  const source = useResolvedImageSource(message.src)
 
   const configuredDimensions = getValidDimensions(
     message.width,
@@ -95,9 +97,9 @@ export function ImageMessageAttachment({
     >
       <AttachmentMedia
         className="image-message-attachment__media"
-        variant={message.src ? "image" : "icon"}
+        variant={source ? "image" : "icon"}
       >
-        {message.src ? (
+        {source ? (
           <img
             alt={message.alt}
             draggable={false}
@@ -114,7 +116,7 @@ export function ImageMessageAttachment({
                 })
               }
             }}
-            src={message.src}
+            src={source}
             width={message.width}
           />
         ) : (

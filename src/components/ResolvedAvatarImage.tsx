@@ -5,6 +5,7 @@ import {
   useContactAvatar,
   useQQAvatar,
 } from "@/hooks/use-qq-avatar"
+import { useResolvedImageSource } from "@/hooks/use-resolved-image-source"
 import type { Contact } from "@/types/chat"
 
 type AvatarImageProps = Omit<ComponentProps<typeof AvatarImage>, "src">
@@ -33,6 +34,7 @@ export function ContactAvatarImage({
   size = 100,
   ...props
 }: ContactAvatarImageProps) {
-  const source = useContactAvatar(contact, size)
+  const avatarSource = useContactAvatar(contact, size)
+  const source = useResolvedImageSource(avatarSource)
   return <AvatarImage {...props} referrerPolicy="no-referrer" src={source} />
 }

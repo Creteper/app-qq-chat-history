@@ -6,6 +6,10 @@ import {
 } from "lucide-react"
 
 import {
+  LocalImageField,
+  type StoredLocalImage,
+} from "@/components/LocalImageField"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -43,6 +47,10 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
+import {
+  deleteLocalImage,
+  isLocalImageReference,
+} from "@/lib/local-image-store"
 import type {
   Contact,
   Message,
@@ -246,6 +254,16 @@ function toOptionalDimension(value: string) {
   return Math.max(1, Math.trunc(parsed))
 }
 
+function getImageAltFromFileName(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "").trim() || "图片"
+}
+
+function discardLocalImage(source: string) {
+  if (isLocalImageReference(source)) {
+    void deleteLocalImage(source).catch(() => undefined)
+  }
+}
+
 function getMessageDirection(message: Message) {
   if (message.type === "text" || message.type === "image") {
     return message.direction
@@ -422,6 +440,9 @@ function MessageFields({
               const nextType = values[0] as MessageType | undefined
 
               if (nextType) {
+                if (message.type === "image" && nextType !== "image") {
+                  discardLocalImage(message.src)
+                }
                 onUpdate(convertMessageType(message, nextType))
               }
             }}
@@ -569,6 +590,32 @@ function MessageFields({
 
         {message.type === "image" ? (
           <>
+            <LocalImageField
+              key={message.id}
+              description="选择后会复制到本机保存，并自动填写图片名称和原始尺寸。"
+              descriptionClassName="message-editor__field-description"
+              fieldClassName="message-editor__field"
+              id={`${idPrefix}-file`}
+              inputClassName="message-editor__field-input message-editor__image-file-input"
+              label="本地图片"
+              labelClassName="message-editor__field-label"
+              onStored={(image: StoredLocalImage) => {
+                const previousSource = message.src
+
+                onUpdate({
+                  ...message,
+                  src: image.reference,
+                  alt: getImageAltFromFileName(image.fileName),
+                  width: image.width,
+                  height: image.height,
+                })
+
+                if (previousSource !== image.reference) {
+                  discardLocalImage(previousSource)
+                }
+              }}
+            />
+
             <Field className="message-editor__field">
               <FieldLabel
                 className="message-editor__field-label"
@@ -579,13 +626,24 @@ function MessageFields({
               <Input
                 className="message-editor__field-input"
                 id={`${idPrefix}-src`}
-                placeholder="https://example.com/image.png"
-                type="url"
-                value={message.src}
-                onChange={(event) =>
-                  onUpdate({ ...message, src: event.target.value })
+                placeholder={
+                  isLocalImageReference(message.src)
+                    ? "当前使用已保存的本机图片"
+                    : "https://example.com/image.png"
                 }
+                type="url"
+                value={
+                  isLocalImageReference(message.src) ? "" : message.src
+                }
+                onChange={(event) => {
+                  const previousSource = message.src
+                  onUpdate({ ...message, src: event.target.value })
+                  discardLocalImage(previousSource)
+                }}
               />
+              <FieldDescription className="message-editor__field-description">
+                填写链接会替换当前选择的本机图片。
+              </FieldDescription>
             </Field>
 
             <Field className="message-editor__field">
@@ -818,6 +876,9 @@ export function MessageEditor({
       messages[selectedIndex + 1] ?? messages[selectedIndex - 1]
 
     setSelectedMessageId(nextSelectedMessage?.id ?? null)
+    if (selectedMessage.type === "image") {
+      discardLocalImage(selectedMessage.src)
+    }
     onDelete(selectedMessage.id)
   }
 

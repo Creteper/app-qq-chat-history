@@ -1,50 +1,113 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useMemo, useState } from "react";
+
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+import { ChatPane } from "@/components/ChatPane";
+import { ConversationSidebar } from "@/components/ConversationSidebar";
+import {
+  PrimaryNavigation,
+  type AppView,
+} from "@/components/PrimaryNavigation";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { WindowTitlebar } from "@/components/WindowTitlebar";
+import { DEFAULT_SELECTED_CONTACT_ID } from "@/data/chat-data";
+import { useContactStore } from "@/hooks/use-contact-store";
+import { useMessageStore } from "@/hooks/use-message-store";
+import { useQQAvatar } from "@/hooks/use-qq-avatar";
+import { cn } from "@/lib/utils";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+const currentUser = {
+  qq: 1902141259,
+  name: "Samuel",
+  signature: "编辑个性签名",
+};
+
+function App() {
+  const { contacts, resetContacts, updateContact } = useContactStore();
+  const {
+    addMessage,
+    deleteMessage,
+    messages,
+    resetMessages,
+    updateMessage,
+  } = useMessageStore();
+  const [view, setView] = useState<AppView>("chat");
+  const [selectedId, setSelectedId] = useState(
+    DEFAULT_SELECTED_CONTACT_ID,
+  );
+  const [maximized, setMaximized] = useState(false);
+  const currentUserAvatar = useQQAvatar(currentUser.qq, 100);
+  const messageUnreadCount = useMemo(
+    () =>
+      contacts.reduce(
+        (total, contact) => total + Math.max(0, contact.unreadCount),
+        0,
+      ),
+    [contacts],
+  );
+
+  const selectedContact = useMemo(
+    () =>
+      contacts.find((contact) => contact.id === selectedId) ?? contacts[0],
+    [contacts, selectedId],
+  );
+
+  if (!selectedContact) {
+    return null;
   }
 
+  const resetAllData = () => {
+    resetContacts();
+    resetMessages();
+  };
+
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+    <TooltipProvider delay={300}>
+      <div className={cn("app-shell", maximized && "is-maximized")}>
+        <WindowTitlebar
+          avatarUrl={currentUserAvatar}
+          displayName={currentUser.name}
+          onMaximizedChange={setMaximized}
+          signature={currentUser.signature}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+
+        <div className="app-surface">
+          <PrimaryNavigation
+            messageUnreadCount={messageUnreadCount}
+            onViewChange={setView}
+            view={view}
+          />
+
+          {view === "chat" ? (
+            <>
+              <ConversationSidebar
+                contacts={contacts}
+                onSelect={setSelectedId}
+                selectedId={selectedContact.id}
+              />
+              <ChatPane
+                contact={selectedContact}
+                isSelf={selectedContact.id === DEFAULT_SELECTED_CONTACT_ID}
+                messages={messages[selectedContact.id] ?? []}
+              />
+            </>
+          ) : (
+            <SettingsPanel
+              contacts={contacts}
+              messages={messages[selectedContact.id] ?? []}
+              onAddMessage={addMessage}
+              onChange={updateContact}
+              onDeleteMessage={deleteMessage}
+              onReset={resetAllData}
+              onSelect={setSelectedId}
+              onUpdateMessage={updateMessage}
+              selectedId={selectedContact.id}
+            />
+          )}
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }
 

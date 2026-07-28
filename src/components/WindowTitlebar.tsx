@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type MouseEvent } from "react"
 import { isTauri } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { MessageCircleMoreIcon } from "lucide-react"
 
 import {
   QQCloseIcon,
+  QQLogoIcon,
   QQMaximizeIcon,
   QQMinimizeIcon,
   QQOvercastIcon,
@@ -163,10 +163,7 @@ export function WindowTitlebar({
             aria-label="QQ"
             className="flex shrink-0 items-center gap-1 font-semibold"
           >
-            <MessageCircleMoreIcon
-              aria-hidden="true"
-              className="size-5 fill-current"
-            />
+            <QQLogoIcon />
             <span>QQ</span>
           </div>
 

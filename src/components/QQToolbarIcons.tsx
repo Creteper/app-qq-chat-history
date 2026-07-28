@@ -9,6 +9,7 @@ import moreIcon from "@/assets/qq-toolbar/more_24.svg";
 import overcastIcon from "@/assets/qq-toolbar/nav_overcast_normal_24.svg";
 import newDialogueIcon from "@/assets/qq-toolbar/new_dialogue_24.svg";
 import phoneIcon from "@/assets/qq-toolbar/phone_24.svg";
+import qqLogoIcon from "@/assets/qq-toolbar/qq_logo_24.svg";
 import shareScreenIcon from "@/assets/qq-toolbar/share_screen_24.svg";
 import switchPanelLeftIcon from "@/assets/qq-toolbar/switch_panel_left_16.svg";
 import videoIcon from "@/assets/qq-toolbar/video_24.svg";
@@ -51,6 +52,10 @@ function QQOriginalIcon({
 
 export function QQPhoneIcon(props: QQToolbarIconProps) {
   return <QQOriginalIcon {...props} size={24} src={phoneIcon} />;
+}
+
+export function QQLogoIcon(props: QQToolbarIconProps) {
+  return <QQOriginalIcon {...props} size={24} src={qqLogoIcon} />;
 }
 
 export function QQVideoIcon(props: QQToolbarIconProps) {
